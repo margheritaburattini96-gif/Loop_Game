@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ki–Ca Loop Builder</title>
+<style>
+  :root{
+    --bg:#ffffff; --surface:#f5f4ef; --surface2:#eceae2; --line:#d3d1c7;
+    --ink:#2c2c2a; --muted:#5f5e5a; --faint:#8a897f;
+    --teal:#1d9e75; --teal-dk:#0f6e56;
+    --coral:#d85a30; --coral-dk:#993c1d;
+    --blue:#185fa5; --blue-dk:#0c447c;
+    --amber:#ba7517; --amber-dk:#854f0b;
+    --pink:#d4537e; --pink-dk:#993556;
+    --purple:#534ab7;
+    --info-bg:#e6f1fb;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1a1a18; --surface:#252521; --surface2:#2f2f2a; --line:#444441;
+      --ink:#eceae2; --muted:#b4b2a9; --faint:#888780;
+      --info-bg:#13283c;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5; padding:20px;
+  }
+  .wrap{max-width:760px; margin:0 auto;}
+  h1{font-size:22px; font-weight:600; margin:0 0 4px;}
+  .sub{font-size:14px; color:var(--muted); margin:0 0 20px;}
+  .controls{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px;}
+  button{
+    font:inherit; font-size:13px; cursor:pointer;
+    background:var(--bg); color:var(--ink);
+    border:1px solid var(--line); border-radius:8px; padding:8px 14px;
+    display:inline-flex; align-items:center; gap:6px; transition:background .15s,border-color .15s;
+  }
+  button:hover{background:var(--surface);}
+  button:active{transform:scale(.98);}
+  .seg{display:inline-flex; background:var(--surface2); border-radius:9px; padding:3px; gap:2px; flex-wrap:wrap;}
+  .seg button{border:none; background:transparent; padding:7px 13px; border-radius:7px;}
+  .seg button.on{background:var(--bg); font-weight:600;}
+  .panels{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media (max-width:560px){ .panels{grid-template-columns:1fr;} }
+  .panel{background:var(--surface); border-radius:12px; padding:12px;}
+  .panel h2{font-size:13px; font-weight:600; color:var(--muted); margin:0 0 6px;}
+  svg{width:100%; height:auto; display:block;}
+  .timerow{display:flex; align-items:center; gap:12px; margin-top:18px;}
+  .timerow span.lab{font-size:13px; color:var(--muted); min-width:36px;}
+  .timerow span.out{font-size:13px; font-weight:600; min-width:44px; text-align:right;}
+  input[type=range]{flex:1; accent-color:var(--blue);}
+  .hint{margin-top:14px; font-size:13px; color:var(--muted); background:var(--info-bg); border-radius:8px; padding:11px 13px;}
+  .legend{display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:10px;}
+  .legend i{display:inline-block; width:14px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px;}
+  footer{margin-top:24px; font-size:12px; color:var(--faint); text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Ki–Ca Loop Builder</h1>
+  <p class="sub">See how the calcium transient and contraction profile trace the Kinematic–Calcium loop over time.</p>
+
+  <div class="controls">
+    <button id="play"><span id="playIcon">▶</span> <span id="playTxt">Play</span></button>
+    <div class="seg" id="modeSeg">
+      <button data-m="healthy" class="on">Healthy</button>
+      <button data-m="lowca">Low calcium</button>
+      <button data-m="highca">High calcium</button>
+      <button data-m="inverted">Contraction-led</button>
+    </div>
+    <button id="compare">◇ Compare with Healthy</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>Signals over time</h2>
+      <svg id="profiles" viewBox="0 0 300 240" role="img" aria-label="Calcium and contraction profiles over time with a moving time cursor">
+        <line x1="34" y1="206" x2="288" y2="206" stroke="var(--line)" stroke-width="1"/>
+        <line x1="34" y1="206" x2="34" y2="20" stroke="var(--line)" stroke-width="1"/>
+        <path id="caProf" fill="none" stroke="var(--teal)" stroke-width="2.5"/>
+        <path id="conProf" fill="none" stroke="var(--coral)" stroke-width="2.5"/>
+        <line id="tline" y1="20" y2="206" stroke="var(--purple)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <circle id="caDot" r="5" fill="var(--teal)" stroke="var(--bg)" stroke-width="1.5"/>
+        <circle id="conDot" r="5" fill="var(--coral)" stroke="var(--bg)" stroke-width="1.5"/>
+        <text x="160" y="230" text-anchor="middle" font-size="11" fill="var(--faint)">time</text>
+      </svg>
+      <div class="legend">
+        <span><i style="background:var(--teal)"></i>Ca²⁺ transient</span>
+        <span><i style="background:var(--coral)"></i>contraction</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Ki–Ca loop</h2>
+      <svg id="loop" viewBox="0 0 300 240" role="img" aria-label="The Ki-Ca loop being drawn point by point as time advances">
+        <line x1="34" y1="206" x2="288" y2="206" stroke="var(--line)" stroke-width="1"/>
+        <line x1="34" y1="206" x2="34" y2="20" stroke="var(--line)" stroke-width="1"/>
+        <path id="loopGhost" fill="none" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <path id="loopComp" fill="none" stroke="var(--faint)" stroke-width="2" stroke-dasharray="5 3" opacity="0"/>
+        <path id="loopDraw" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round"/>
+        <circle id="loopDot" r="5.5" fill="var(--blue)" stroke="var(--bg)" stroke-width="1.5"/>
+        <text x="160" y="230" text-anchor="middle" font-size="11" fill="var(--faint)">Ca²⁺ transient</text>
+        <text x="18" y="120" text-anchor="middle" font-size="11" fill="var(--faint)" transform="rotate(-90 18 120)">contraction</text>
+      </svg>
+      <div class="legend">
+        <span id="distLab">peak–peak distance: <b id="distVal">–</b></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timerow">
+    <span class="lab">time</span>
+    <input type="range" id="t" min="0" max="100" value="0" step="1">
+    <span class="out" id="tout">0%</span>
+  </div>
+
+  <div class="hint" id="hint">
+    Drag the slider: at each instant, the calcium value and the contraction value form one point — together they land on the loop. Run to the end and the loop closes. The loop's area and shape reveal how well excitation and contraction are coupled.
+  </div>
+
+  <footer>
+    Ki–Ca Loop Builder · illustrative model · 50th EWGCCE Meeting, Leuven 2026
+  </footer>
+</div>
+
+<script>
+(function(){
+  var N=160;
+  function transient(t0,r,d){
+    var arr=[],mx=0,i,t,v,tau;
+    for(i=0;i<N;i++){
+      t=i/(N-1); v=0;
+      if(t>=t0){tau=t-t0; v=(1-Math.exp(-tau/r))*Math.exp(-tau/d);}
+      arr.push(v); if(v>mx)mx=v;
+    }
+    return arr.map(function(x){return mx>0?x/mx:0;});
+  }
+  // Each phenotype: calcium + contraction profiles and a contraction amplitude.
+  var P={
+    healthy:  {ca:transient(0.10,0.045,0.16), con:transient(0.14,0.075,0.26), caAmp:1.00, amp:1.00, color:'#185fa5', dk:'#0c447c'},
+    lowca:    {ca:transient(0.10,0.045,0.16), con:transient(0.14,0.075,0.26), caAmp:0.50, amp:0.55, color:'#d4537e', dk:'#993556'},
+    highca:   {ca:transient(0.10,0.045,0.16), con:transient(0.14,0.075,0.26), caAmp:1.00, amp:1.15, color:'#1d9e75', dk:'#0f6e56'},
+    inverted: {ca:transient(0.17,0.07,0.22),  con:transient(0.10,0.05,0.18),  caAmp:0.90, amp:0.85, color:'#534ab7', dk:'#3c3489'}
+  };
+  var mode='healthy', showCompare=false, playing=false, raf=null;
+
+  var PX0=34,PX1=288,PY0=206,PY1=24;
+  var LX0=42,LX1=280,LY0=200,LY1=30;
+  function pfx(i){return PX0+(i/(N-1))*(PX1-PX0);}
+  function pfy(v){return PY0-v*(PY0-PY1);}
+  function lx(ca){return LX0+ca*(LX1-LX0);}
+  function ly(con){return LY0-con*(LY0-LY1);}
+
+  function data(m){var p=P[m]; return {ca:p.ca.map(function(v){return v*(p.caAmp||1);}), con:p.con.map(function(v){return v*p.amp;}), color:p.color, dk:p.dk};}
+
+  function path(xf,yf,n){var d="M"+xf(0).toFixed(1)+" "+yf(0).toFixed(1),i; for(i=1;i<n;i++)d+=" L"+xf(i).toFixed(1)+" "+yf(i).toFixed(1); return d;}
+
+  function peakDist(d){
+    var ia=0,ic=0,i;
+    for(i=1;i<N;i++){if(d.ca[i]>d.ca[ia])ia=i; if(d.con[i]>d.con[ic])ic=i;}
+    var dx=lx(d.ca[ia])-lx(d.ca[ic]), dy=ly(d.con[ia])-ly(d.con[ic]);
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+
+  function drawStatic(){
+    var d=data(mode);
+    document.getElementById('caProf').setAttribute('d', path(function(i){return pfx(i);},function(i){return pfy(d.ca[i]);},N));
+    document.getElementById('conProf').setAttribute('d', path(function(i){return pfx(i);},function(i){return pfy(d.con[i]);},N));
+    document.getElementById('loopGhost').setAttribute('d', path(function(i){return lx(d.ca[i]);},function(i){return ly(d.con[i]);},N)+" Z");
+    var od=data('healthy');
+    var comp=document.getElementById('loopComp');
+    comp.setAttribute('d', path(function(i){return lx(od.ca[i]);},function(i){return ly(od.con[i]);},N)+" Z");
+    comp.setAttribute('opacity', (showCompare && mode!=='healthy')?'0.7':'0');
+    var draw=document.getElementById('loopDraw'), dot=document.getElementById('loopDot');
+    draw.setAttribute('stroke', d.color); dot.setAttribute('fill', d.color);
+    var pd=peakDist(d);
+    document.getElementById('distVal').textContent=(pd/ (LX1-LX0) *0.08).toFixed(3)+' a.u.';
+  }
+
+  function update(pct){
+    var d=data(mode);
+    var idx=Math.round(pct/100*(N-1)),i;
+    var xt=pfx(idx);
+    document.getElementById('tline').setAttribute('x1',xt);
+    document.getElementById('tline').setAttribute('x2',xt);
+    document.getElementById('caDot').setAttribute('cx',xt);
+    document.getElementById('caDot').setAttribute('cy',pfy(d.ca[idx]));
+    document.getElementById('conDot').setAttribute('cx',xt);
+    document.getElementById('conDot').setAttribute('cy',pfy(d.con[idx]));
+    var dl="M"+lx(d.ca[0]).toFixed(1)+" "+ly(d.con[0]).toFixed(1);
+    for(i=1;i<=idx;i++)dl+=" L"+lx(d.ca[i]).toFixed(1)+" "+ly(d.con[i]).toFixed(1);
+    document.getElementById('loopDraw').setAttribute('d',dl);
+    document.getElementById('loopDot').setAttribute('cx',lx(d.ca[idx]));
+    document.getElementById('loopDot').setAttribute('cy',ly(d.con[idx]));
+    document.getElementById('tout').textContent=Math.round(pct)+'%';
+  }
+
+  var slider=document.getElementById('t');
+  slider.addEventListener('input',function(){stopPlay(); update(+slider.value);});
+
+  function stopPlay(){playing=false; if(raf)cancelAnimationFrame(raf);
+    document.getElementById('playIcon').textContent='▶'; document.getElementById('playTxt').textContent='Play';}
+  function startPlay(){
+    playing=true;
+    document.getElementById('playIcon').textContent='❚❚'; document.getElementById('playTxt').textContent='Pause';
+    var v=+slider.value; if(v>=100)v=0;
+    (function step(){
+      if(!playing)return;
+      v+=0.8; if(v>=100){v=100; slider.value=v; update(v); stopPlay(); return;}
+      slider.value=v; update(v); raf=requestAnimationFrame(step);
+    })();
+  }
+  document.getElementById('play').addEventListener('click',function(){playing?stopPlay():startPlay();});
+
+  document.getElementById('modeSeg').addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b)return;
+    mode=b.getAttribute('m')||b.getAttribute('data-m');
+    [].forEach.call(this.querySelectorAll('button'),function(x){x.classList.toggle('on',x===b);});
+    drawStatic(); update(+slider.value);
+  });
+
+  document.getElementById('compare').addEventListener('click',function(){
+    showCompare=!showCompare; drawStatic();
+    this.style.background=showCompare?'var(--info-bg)':'var(--bg)';
+  });
+
+  drawStatic(); update(0);
+})();
+</script>
+</body>
+</html>
